@@ -1,0 +1,709 @@
+<html>
+    <head>
+        <title>高鐵訂票囉~</title>
+        
+        <link rel="short icon" href="{{url_for('static', filename='Mark.png')}}">
+        <link rel="stylesheet" href="static/css/jquery-ui-1.12.1-css/jquery-ui.css">
+        
+        <script src="static/js/jquery-1.12.4.js"></script>
+        <script src="static/js/jquery-ui.js"></script>
+        <script src="static/js/bootstrap.min.js"></script>
+        <link rel="stylesheet" href="static/css/bootstrap.min.css">
+        <!--<script src="static/js/bootstrap-confirmation.min.js"></script>
+        <script src="static/js/popper.min.js"></script>
+        <script src="static/js/main.js"></script>-->
+        <script src="static/js/bootstable.min.js"></script>
+      
+    
+        <script>  
+            
+            function checkEditing($row) {
+                if($row.attr('id')=='editing') {
+                    return true;
+                }else{
+                    return false;
+                }
+            }
+
+            //Set buttons state
+            function SetButtonsNormal(but) {
+                $(but).parent().find('#bAcep').hide();
+                $(but).parent().find('#bCanc').hide();
+                $(but).parent().find('#bEdit').show();
+                $(but).parent().find('#bElim').show();
+                // clear the row's attribute
+                var $row = $(but).parents('tr');  
+                $row.attr('id', '');  
+            }
+            function SetButtonsEdit(but) {
+                $(but).parent().find('#bAcep').show();
+                $(but).parent().find('#bCanc').show();
+                $(but).parent().find('#bEdit').hide();
+                $(but).parent().find('#bElim').hide();
+                // Given row the "editing" attribute flag
+                var $row = $(but).parents('tr');  
+                $row.attr('id', 'editing');  
+            }
+            //Events functions
+            function butRowAcep(but, no){
+                
+                var $row = $(but).parents('tr');  
+                var $cols = $row.find('td'); 
+                if (!checkEditing($row)) return; 
+                
+                // find input data for update
+                var data_obj = new Object();
+                data_obj.id = no;
+                
+                // Data check and handing
+                var mode = "";
+                var isValidData = true;
+                IterarCamposEdit($cols, function($td){
+                   //////////////////////////////////////////////
+                   if($td.attr('id')=="Total"){
+                       data_obj.total = $td.html().trim();
+                       if(data_obj.total =="0") isValidData = false;
+                    } 
+                   //////////////////////////////////////////////
+                   if($td.attr('id')=="Name" || $td.attr('id')=="Date" || $td.attr('id')=="Amount"){              
+                        var cont = $td.find('input').val();   
+                        if(cont!=undefined){ cont=cont.trim();}
+                        if(cont =="") isValidData = false;
+                        if($td.attr('id')=="Name"){
+                            if(cont == undefined){ // no input
+                                mode = "Update";
+                                data_obj.name = $td.html().trim();
+                            }else{    // with input
+                                mode = "Insert";
+                                data_obj.name = $td.find('input').val().trim();   
+                            }
+                            if(data_obj.name =="") isValidData = false;
+                        }else if($td.attr('id')=="Date"){
+                            data_obj.date = cont;
+                        }else if($td.attr('id')=="Amount"){
+                            data_obj.amount = cont;
+                        }
+                        $td.html(cont);
+                    }
+                    //////////////////////////////////////////////
+                    if($td.attr('id')=="TrainID" || $td.attr('id')=="From" || $td.attr('id')=="To"){ 
+                        var sele = $td.find('select').val().trim();
+                        if(sele =="") isValidData = false; 
+                        if($td.attr('id')=="TrainID"){ // 
+                            data_obj.trainid = sele;
+                        }else if($td.attr('id')=="From"){  //
+                            data_obj.startStat = sele;
+                        }else if($td.attr('id')=="To"){    //
+                            data_obj.endStat = sele;
+                        }  
+                        $td.html(sele);
+                    }
+                    //////////////////////////////////////////////
+                });
+                //--
+                console.log(mode + " "+isValidData);
+                console.log(data_obj);
+                //--
+                if(!isValidData){
+                   $row.remove(); return;
+                }
+                // ---- send data
+                if(mode=="Update"){
+                    $.ajax({
+                        url: '/update',
+                        type: 'POST',
+                        data: data_obj, 
+                        success: function(msg){},
+                        error: function(response) {
+                            alert("Error: " + response.status);
+                        }               
+                    });  
+                }else if(mode=="Insert"){
+                    $.ajax({
+                        url: '/insert',
+                        type: 'POST',
+                        data: data_obj, 
+                        success: function(msg){},
+                        error: function(response) {
+                            alert("Error: " + response.status);
+                        }               
+                    }); 
+                    //console.log("Insert ajax under construct");
+                }
+                SetButtonsNormal(but);
+            }
+            function butRowCancel(but) {
+                var $row = $(but).parents('tr');  
+                var $cols = $row.find('td');  
+                if (!checkEditing($row)) return;  
+
+                // ==== put input values to html
+                IterarCamposEdit($cols, function($td) {  
+                    var cont = $td.find('div').html(); 
+                    $td.html(cont);  
+                });
+
+                $row.remove();
+       
+                // ==== set buttons normal
+                SetButtonsNormal(but);
+            }
+            
+            function butRowEdit(but) {  
+                //Start the edition mode for a row.
+                var $row = $(but).parents('tr');  // find row element as row
+                var $cols = $row.find('td');      // find td elements as cols
+                if (checkEditing($row)) return;
+                var focused=false;  //flag
+                IterarCamposEdit($cols, function($td) {  
+                    var cont = $td.html().trim(); 
+                    //Save previous content in a hide <div>
+                    if($td.attr('id')==undefined || $td.attr('id')=="Total"){
+                        pass = null;
+                    }else if($td.attr('id')=="Name"){
+                        pass = null;
+                        //var div  =  '<div style="display: none;">' + cont + '</div>';
+                        //$td.html(div);
+                    }else if($td.attr('id')=="Date"){
+                        var div  =  '<div style="display: none;">' + cont + '</div>';
+                        var input = '<input type="datetime" class="form-control input-sm" value="'+ cont +'" >'
+                        $td.html(div + input);
+                    }else if($td.attr('id')=="Amount"){
+                        var div  =  '<div style="display: none;">' + cont + '</div>';
+                        var input = '<input type="number" min="0" max="10" steps=1 class="form-control input-sm" value="'+ cont +'">'
+                        $td.html(div + input);      
+                    }else if($td.attr('id')=="From" || $td.attr('id')=="To" || $td.attr('id')=="TrainID"){
+                        var div  = '<div style="display: none;">' + cont + '</div>';
+                        var select = '<select name="'+$td.attr('id')+'" id="selector" class="form-control input-sm" >'
+                                   + '<option value="'+ cont +'">'+cont+'</option>'
+                                   +'</select>'         
+                        $td.html(div + select);
+                    }else {
+                        var div  = '<div style="display: none;">' + cont + '</div>';  
+                        var input= '<input class="form-control input-sm" value="' + cont + '">';
+                        $td.html(div + input);
+                    }
+                    //Set focus to first column
+                    if (!focused) {
+                       $td.find('input').focus();
+                       focused = true;
+                    } 
+                });
+                //////////////////////////////////
+                // 1. date picker event
+                $("#dataTbl tbody input[type=datetime]").datepicker({
+                    changeMonth: false, 
+                    changeYear: false, 
+                    dateFormat: "yy/m/d",
+                    showButtonPanel: false,
+                }).on("change", function() {
+                    //console.log($("#dataTbl tbody input[type=datetime]").val());
+                    //$("#dataTbl tbody select[id=selector]").empty();
+                    console.log("Generate From");
+                    $.getJSON(
+                        "/updateDrop/dateSele",{
+                            date : $("#dataTbl tbody input[type=datetime]").val()
+                        }, function(data){ 
+                            $("#dataTbl tbody select[name=From]").html(data.start_opt);
+                            // clear to
+                            // clear price
+                            // clear amount
+                        }
+                    );
+                });
+                
+                // 2. get options from backend
+                // From -> To
+                $("#dataTbl tbody select[name=From]").on("change", function() {
+                    if($("#dataTbl tbody select[name=From]").val()!=null){
+                        console.log("Generate To");
+                        $.getJSON('/updateDrop/startSele', {
+                            date : $("#dataTbl tbody input[type=datetime]").val(),
+                            sele_start:$("#dataTbl tbody select[name=From]").val(),
+                        }).success(function(data) {
+                            $("#dataTbl tbody select[name=To]").html(data.end_opt);
+                            // clear price
+                            // clear amount
+                        })
+                    }
+                });
+                // To -> trainID
+                $("#dataTbl tbody select[name=To]").on("change", function() {
+                    if($("#dataTbl tbody select[name=To]").val()!=null){
+                        console.log("Generate TrainID");
+                        $.getJSON('/updateDrop/endSele', {
+                            date : $("#dataTbl tbody input[type=datetime]").val(),
+                            sele_start:$("#dataTbl tbody select[name=From]").val(),
+                            sele_end: $("#dataTbl tbody select[name=To]").val(),
+                        }).success(function(data) {
+                            $("#dataTbl tbody select[name=TrainID]").html(data.train_opt);
+                            // set amount
+                            // set price
+                            
+                        })
+                    }
+                });
+                // trainID -> price
+                $("#dataTbl tbody select[name=TrainID]").on("change", function() {
+                    if($("#dataTbl tbody select[name=TrainID]").val()!=null){
+                        console.log("Generate Amount and Price");
+                        $.getJSON('/updateDrop/trainSele', {
+                            date : $("#dataTbl tbody input[type=datetime]").val(),
+                            sele_start: $("#dataTbl tbody select[name=From]").val(),
+                            sele_end: $("#dataTbl tbody select[name=To]").val(),
+                            trainid: $("#dataTbl tbody select[name=TrainID]").val()
+                        }).success(function(data) { 
+                            if($("#dataTbl tbody td[id=Amount] input[type=number]").val() > data.amount_limit){
+                                $("#dataTbl tbody td[id=Amount] input[type=number]").val(data.amount_limit);
+                            }
+                            $("#dataTbl tbody td[id=Amount] input[type=number]").attr('max', data.amount_limit);
+                            $("#dataTbl tbody tr[id=editing] [id=Total]").html(data.price_show); 
+                        })
+                    }
+                });
+                
+                // amount -> price
+                $("#dataTbl tbody td[id=Amount] input[type=number]").on("change", function() {
+                    $.getJSON('/updateDrop/amountSele', {
+                        date : $("#dataTbl tbody input[type=datetime]").val(),
+                        trainid: $("#dataTbl tbody select[name=TrainID]").val(),
+                        sele_start: $("#dataTbl tbody select[name=From]").val(),
+                        sele_end: $("#dataTbl tbody select[name=To]").val(),
+                        amount: $("#dataTbl tbody td[id=Amount] input[type=number]").val()
+                    }).success(function(data) {
+                        $("#dataTbl tbody tr[id=editing] [id=Total]").html(data.price_show);
+                    })
+                });
+                //////////////////////////////////
+                SetButtonsEdit(but);
+            }
+            
+            function butRowDelete(but, no) {  
+                // BeforeDelete();
+                var yes = confirm('Are you sure to delete orderID '+no+'?');
+                // onDelete
+                if (yes){ 
+                    (function(){ 
+                        location.href = "/delete/"+no;
+                    })();
+                    var $row = $(but).parents('tr');
+                    $row.remove();
+                } 
+            }
+            ///////////////////////////////////////////////////////////
+            
+            function rowAddNew(tabId) {  
+                var $tab_en_edic = $("#"+tabId);  // Table to edit
+                
+                if(!checkEditing($tab_en_edic.find('tbody tr:last'))){
+                    var val = parseInt($tab_en_edic.find('tbody tr:last td:first').html());
+                    var newOrderID = (!isNaN(val)) ? val+1 : 1;
+                    var htmlDat = '<tr>'
+                                 +'<td>'+newOrderID+'</td>'
+                                 +'<td id="Name">'+'<input class="form-control input-sm" value="Admin" required>'+'</td>'
+                                 +'<td id="Date"></td>'
+                                 +'<td id="TrainID"></td>'
+                                 +'<td id="From"></td>'
+                                 +'<td id="To"></td>'
+                                 +'<td id="Amount">1</td>'
+                                 +'<td id="Total">0</td>'
+                                 +'<td name="buttons">' 
+                                 +'<div class="btn-group pull-right">'
+                                 +'<button id="bEdit" type="button" class="btn btn-sm btn-warning" onclick="butRowEdit(this)">'+'<span class="glyphicon glyphicon-pencil" > </span> </button>'
+                                 +'<button id="bElim" type="button" class="btn btn-sm btn-danger" onclick="butRowDelete(this, '+newOrderID+')">'+'<span class="glyphicon glyphicon-trash" > </span> </button>'
+                                 +'<button id="bAcep" type="button" style="display:none;" class="btn btn-sm btn-success" onclick="butRowAcep(this,'+newOrderID+')">'+'<span class="glyphicon glyphicon-ok"> </span> </button>'
+                                 +'<button id="bCanc" type="button" style="display:none;" class="btn btn-sm btn-default" onclick="butRowCancel(this)">'+'<span class="glyphicon glyphicon-remove"> </span></button>'
+                                 +'</div>'
+                                 +'</td>'
+                                 +'</tr>';
+                    $tab_en_edic.find('tbody').append(htmlDat);
+                    butRowEdit($tab_en_edic.find('tbody tr:last td:last #bEdit'));
+                }
+            }
+            ///////////////////////////////////////////////////////////
+        </script>
+        <style>
+            .no-border{
+              border:none;
+            }
+            
+
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-default">
+            <div class="container-fluid">
+                <!-- navigation button -->
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="/"> Ticket System </a>
+                </div>
+                <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                    <!--<form action="" method="get" class="navbar-form navbar-left">
+                        <div class="form-group">
+                            <input type="text" name="name" class="form-control" placeholder="Name...">
+                        </div>
+                        <button type="submit" class="btn btn-default">Search</button>
+                    </form>-->
+                    <ul class="nav navbar-nav navbar-right">
+                        <li><a href="">Login</a></li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+        {% block body %}
+        
+        <div class="container-fluid">
+            <!-- Header -->
+            <div class ="well text-center"> 
+                <h1> High Speed Rail Ticket  </h1>
+            </div>
+            <!--  Train Schedule Panel Content -->
+            
+            
+            <!-- ######################################################## -->
+            <!--  Booking Panel Content -->
+            <div class="container">
+                <div class="row">
+                    <div class="col md-12">
+                        <h2> 
+                            Train Schedule <button type="button" class="btn btn-success pull-right" data-toggle="modal" data-target="#reservForm"> Booking </button>
+                        </h2>
+                        <!-- ////////////////// show information ///////////////////////  -->
+                        {% with messages = get_flashed_messages() %}
+                            {% if messages %}
+                                {% for message in messages %}
+                                    <div role="alert" class="alert alert-success alert-dismissable" >
+                                        <button type="button" class="close" data-dismiss="alert" aria-label="close">
+                                            <span aria-hidden="true">x</span>
+                                        </button>
+                                        {{message}}
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                    <table  id="trainTbl" class="table table-bordered table-striped table-hover text-center">
+                        <!--class="table table-striped ">-->
+                        <!-- column name -->
+                        <thead>
+                                <th class="text-center"> Date</th>
+                                <th class="text-center"> From</th> 
+                                <th class="text-center"> To</th>
+                                <th class="text-center"> TrainID</th>
+                                <th class="text-center"> Seats </th>
+                                <!--<th class="text-center">  </th>-->
+                        </thead>
+                        <tbody>
+                            {% for row in train_shedule %} <!-- parameter from flask -->
+                                <tr>
+                                    <td>{{row.0}} </td> 
+                                    <td>{{row.1}} </td> 
+                                    <td>{{row.2}} </td>
+                                    <td>{{row.3}} </td>
+                                    <td>{{row.4}} </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col md-12">
+                        <h2> 
+                            Booking Panel 
+                        </h2>
+                        
+                        <!-- Table -->
+                        <table  id="dataTbl" class="table table-bordered table-striped table-hover text-center">
+                            <!--class="table table-striped ">-->
+                            <!-- column name -->
+                            <thead>
+                                <th class="text-center"> OrderID </th> 
+                                <th class="text-center"> Name</th> 
+                                <th class="text-center"> Date</th> 
+                                <th class="text-center"> TrainID</th> 
+                                <th class="text-center"> From</th> 
+                                <th class="text-center"> To</th> 
+                                <th class="text-center"> Amount</th> 
+                                <th class="text-center"> Total</th>
+                                <th class="text-center">  </th>
+                            </thead>
+                            <!-- Table -->
+                            <tbody>
+                            <!-- get and show data from database -->
+                            {% for row in booking %} <!-- parameter from flask -->
+                                <tr>
+                                    <td> {{row.0}}</td> 
+                                    <td id='Name'>{{row.1}} </td> 
+                                    <td id='Date'>{{row.2}} </td>
+                                    <td id='TrainID'>{{row.3}} </td>
+                                    <td id='From'>{{row.4}} </td>
+                                    <td id='To'>{{row.5}} </td>
+                                    <td id='Amount'>{{row.6}} </td>
+                                    <td id='Total'>{{row.7}} </td>
+                                    <!--<input type="text" value='{{row.1}}' size="10"> -->
+                                    <td name="buttons">
+                                        <div class="btn-group pull-right">
+                                            <button id="bEdit" type="button" class="btn btn-sm btn-warning" onclick="butRowEdit(this)"> <!--onclick="butRowEdit(this);"-->
+                                                <span class="glyphicon glyphicon-pencil" > </span>
+                                            </button>
+                                            <button id="bElim" type="button" class="btn btn-sm btn-danger" onclick="butRowDelete(this, {{row.0}})"> <!--onclick="butRowDelete(this);"-->
+                                                <span class="glyphicon glyphicon-trash" > </span>
+                                            </button>
+                                            <button id="bAcep" type="button" class="btn btn-sm btn-success" style="display:none;" onclick="butRowAcep(this, {{row.0}})"> <!--onclick="butRowAcep(this);"-->
+                                                <span class="glyphicon glyphicon-ok"> </span>
+                                            </button>
+                                            <button id="bCanc" type="button" class="btn btn-sm btn-default" style="display:none;" onclick="butRowCancel(this)"> <!--onclick="butRowCancel(this);"-->
+                                                <span class="glyphicon glyphicon-remove"> </span>
+                                            </button>
+                                        </div>
+                                       
+                                    </td>
+                                </tr>
+                                
+                                <!--  Update function 
+                                <div id="modaledit{{row.0}}" class="modal fade" role="dialog">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                                <h4 class="modal-title">Please Edit Data</h4>
+                                            </div>
+                                            <div class="modal-body">
+                                                <form action="{{url_for('update')}}" method="post">
+                                                    <div class="form-group">
+                                                        <label>Name:</label> 
+                                                        <input type="hidden" name="id" value="{{row.0}}">
+                                                        <input type="text" class="form-control" name="name" value='{{row.1}}'/>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Date:</label> 
+                                                        <input type="text" class="form-control" name="date" value="{{row.2}}"/>
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>trainID:</label> 
+                                                        <input type="text" class="form-control" name="trainid" value="{{row.3}}" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>From:</label> 
+                                                        <input type="text" class="form-control" name="startStat" value="{{row.4}}" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>To:</label> 
+                                                        <input type="text" class="form-control" name="endStat" value="{{row.5}}" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Amount:</label> 
+                                                        <input type="text" class="form-control" name="amount" value="{{row.6}}" />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <div class="text-right">
+                                                            <button class="btn btn-primary" type="submit">OK</button>
+                                                        </div>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                            <!--
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                            </div>
+                                            -->
+                                        <!--</div>
+                                    </div>
+                                </div>-->
+                            {% endfor %}
+                            </tbody> 
+                        </table>
+                        
+                    </div>  
+                </div>
+                <div class="row align-items-center justify-content-center" >
+                    <button class="btn btn-info" id="add" onclick="rowAddNew('dataTbl');"><span class="glyphicon glyphicon-plus-sign"></span>Add New Order</button>
+                </div>
+            </div>
+            
+            
+            <!-- Menu -->
+            <div class="modal fade" id="reservForm" tabindex="-1" role="dialog" aria-labelledby="ModalCenterTitle" aria-hidden="true">
+                 <div class="modal-dialog modal-dialog-centered" role="document">
+                    <div class="modal-content">
+                        <div class="modal-body">
+                            <form id="myForm" action="{{url_for('insert')}}" method="post"> <!-- bind with function-->
+                                <div class="form-group col-xs-5">
+                                    <label for="Name">Name</label>     <!-- -->
+                                    <input name="name" type="text" class="form-control" id="Name" value="Tom"> <!--  -->
+                                </div>
+                                <div class="form-group col-xs-5">
+                                    <label for="datepicker">Date</label>
+                                    <button id="hiddenBtn" type="button" style="display:none;"></button>
+                                    <input  name="date" type="text" class="form-control" id="datepicker" required>
+                                </div>
+                                <div class="form-group col-xs-4">
+                                    <label for="startSelect">From</label>
+                                    <select name="startStat" class="form-control" id="startSelect" required></select>
+                                </div>
+                                <div class="form-group col-xs-4">
+                                    <label for="endSelect">To</label>
+                                    <select name="endStat" class="form-control" id="endSelect" required></select>
+                                </div>
+                                
+                                <div class="form-group col-xs-6">
+                                    <label for="trainid">TrainID</label>
+                                    <select name="trainid" class="form-control" id="trainid" required></select>
+                                </div>
+                                
+                                <div class="form-group col-xs-2">
+                                    <label for="amount">Amount</label>
+                                    <select name="amount" class="form-control" id="amount" required></select>
+                                </div>
+                                
+                                <h3> Price: </h3>
+                                <h2> <div align="center" id="show_price">  </div> </h2>
+                                <input type="hidden" name="total" id="price" value='0'/>
+                            </form>
+                            
+                        </div>
+                        <div class="modal-footer  no-border" >
+                            <button id="cancelBtn" type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                            <!--<br><br>-->
+                            <button  type="submit" form="myForm" class="btn btn-primary" >Confirm</button> 
+                            <!--<button  id ="submitBtn" type="button" class="btn btn-primary" >Confirm</button> -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="row row-padding"></div>
+      
+            {% endblock %}
+            <!-- Footer -->
+            <div class="well" >
+                <div class="col">
+                   <h5> This is our project
+                        <span class="pull-right"> Content us</span>
+                   </h5>
+                </div>
+            </div>
+        </div>
+    </body>
+    <style> 
+        [class*="row-"] {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        } 
+    </style>
+    <script>
+
+        $('#show_price').text($('#price').val());
+        
+        /*$("#search_form_input").keyup(function(){
+            var text = $(this).val();
+
+            $.ajax({
+              url: "/query",
+              type: "get",
+              data: {jsdata: text},
+              success: function(response) {
+                $("#place_for_suggestions").html(response);
+              },
+              error: function(xhr) {
+                //Do Something to handle error
+              }
+            });
+        });*/
+        
+        $(document).ready(function() {
+
+            $('#price').val('0');
+            
+            $("#cancelBtn").click(function() {
+                //$('#startSelect').val("");
+                $('#endSelect').val("");
+                $('#trainid').val("");
+                $('#amount').val("0");
+                $('#show_price').text("0");
+                
+            }); 
+            
+            $( "#datepicker" ).datepicker({
+                changeMonth: false, 
+                changeYear: false, 
+                dateFormat: "yy/m/d",
+                showButtonPanel: false,
+            }).on("change", function() {
+                //console.log($("#datepicker").val());
+                $.getJSON(
+                    "/updateDrop/dateSele",{
+                    date : $("#datepicker").val()
+                    }, function(data){ 
+                        $('#startSelect').html(data.start_opt);
+                    }
+                );
+            });
+            
+            
+            $('#startSelect').change(function(){
+                $.getJSON('/updateDrop/startSele', {
+                    date : $("#datepicker").val(),
+                    sele_start: $('#startSelect').val(),
+                    //sele_end: $('#endSelect').val(),
+                    //trainid: $('#trainid').val()
+                }).success(function(data) {
+                    $('#endSelect').html(data.end_opt);
+                    //$('#trainid').html(data.train_selected);
+                    //$('#amount').html(data.amountAllow);
+                })
+            });
+            
+            $('#endSelect').change(function(){
+                $.getJSON('/updateDrop/endSele', {
+                    date : $("#datepicker").val(),
+                    sele_start: $('#startSelect').val(),
+                    sele_end: $('#endSelect').val(),
+                    //trainid: $('#trainid').val()
+                }).success(function(data) {
+                    $('#trainid').html(data.train_opt);
+                    //$('#amount').html(data.amountAllow);
+                })
+            });
+            
+             $('#trainid').change(function(){
+                $.getJSON('/updateDrop/trainSele', {
+                    date : $("#datepicker").val(),
+                    sele_start: $('#startSelect').val(),
+                    sele_end: $('#endSelect').val(),
+                    trainid: $('#trainid').val()
+                }).success(function(data) {
+                    let htmlDat = '<option value="0">0</option>';
+                    let max_allow_reserv = 5;
+                    for (let i = 1; i < Math.min(data.amount_limit, max_allow_reserv)+1 ; i++) {
+                        htmlDat += '<option value="'+ i +'">'+i+'</option>';
+                    }
+                    console.log(data.amount_limit);
+                    $('#amount').html(htmlDat); 
+                    $('#show_price').text(data.price_show);
+                    $('#price').val(data.price_show);
+                })
+            });
+            
+            $('#amount').change(function(){
+                $.getJSON('/updateDrop/amountSele', {
+                    date : $("#datepicker").val(),
+                    trainid: $('#trainid').val(),
+                    sele_start: $('#startSelect').val(),
+                    sele_end: $('#endSelect').val(),
+                    amount: $('#amount').val()
+                }).success(function(data) {
+                    $('#show_price').text(data.price_show);
+                    $('#price').val(data.price_show);
+                })
+            });
+            
+        });  
+        </script>
+</html>
