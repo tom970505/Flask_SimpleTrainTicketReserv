@@ -2,11 +2,15 @@
 
 
 
-This project is built with Python Flask, Bootstrap and JQuery  
+This project is built with Python Flask, Bootstrap and JQuery.
+
+This system simply implements basic CRUD features for the booking list table and queries available trains, seats, and prices from the train schedule table.
+
+Using AJAX or form submit to communicate with server side.    
 
 ![cover02](images/cover02.png)
 
-![cover](images/cover.png)
+![cover](images/cover03.png)
 
 
 
@@ -26,13 +30,20 @@ Pandas 0.23.0
 
 2. Install dependencies
 
-   ```
-   pip install -r requirements.txt
-   ```
 
 
 ## Usage
-
+0. Create your DB in MySQL :
+	```sql
+   CREATE DATABASE *****;  // your DB name 
+	```
+1. Create default Tables:
+   Remember to fix DB username and password in file.
+```
+   python dbCreate.py
+```
+2. Execute system:
+   Remember to fix DB username and password in file.
 ```
    python App.py
 ```
